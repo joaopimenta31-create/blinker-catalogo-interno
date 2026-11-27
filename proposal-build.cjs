@@ -1,0 +1,11 @@
+require('./customer-price-build.cjs');
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const path='public/index.html';
+let html=fs.readFileSync(path,'utf8');
+const marker='>Ver ficha</button></div>\').join(\'\')';
+assert.ok(html.includes(marker));
+html=html.replace(marker,()=>'>Ver ficha</button><button type="button" data-quote-ref="\'+esc(p[0])+\'">Adicionar à proposta</button></div>\').join(\'\')');
+fs.copyFileSync('proposta.js','public/proposta.js');
+fs.copyFileSync('proposta.css','public/proposta.css');
+html+='\n<link rel="stylesheet" href="proposta.css"><script src="proposta.js"></script>';
+fs.writeFileSync(path,html);

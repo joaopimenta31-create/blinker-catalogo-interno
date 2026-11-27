@@ -1,0 +1,8 @@
+.comparison-actions{display:grid;gap:4px;flex-shrink:0}.comparison-actions [aria-pressed=true]{background:#fff0e5;color:#873900}
+.comparison-tray{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:8px;font-size:13px}
+.comparison-tray button,.comparison-actions button{padding:8px 10px}
+.comparison-dialog{box-sizing:border-box;width:min(95vw,800px);max-height:88dvh;overflow:auto;border:0;border-radius:14px;color:#17212b;padding:16px}
+.comparison-dialog::backdrop{background:#17212bb3}.comparison-dialog h2{margin:0 0 10px}
+.comparison-dialog table{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:14px;font-size:14px}
+.comparison-dialog th,.comparison-dialog td{text-align:left;vertical-align:top;padding:9px 6px;border-bottom:1px solid #ddd;overflow-wrap:anywhere;white-space:pre-line}
+.comparison-dialog thead{background:#fff0e5}.comparison-dialog th:first-child{width:23%}

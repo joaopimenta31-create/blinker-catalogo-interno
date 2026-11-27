@@ -1,0 +1,10 @@
+require('./search-layout.cjs');
+const fs = require('node:fs');
+const path = 'public/index.html';
+const html = fs.readFileSync(path, 'utf8');
+const summary = /<main><div class="panel"><b>([\d\s]+ referências)<\/b><p class="muted">([^<]+)<\/p><\/div>/;
+const match = html.match(summary);
+if (!match || !html.includes('</main>')) throw Error('Resumo do catálogo em falta');
+const footer = '<footer class="catalog-summary"><b>' + match[1] + '</b><p>' + match[2] + '</p></footer>';
+const css = '<style>.catalog-summary{margin:24px 0 0;padding:10px 0;border-top:1px solid #d6dbe1;font-size:12px;line-height:1.45;color:#515d67}.catalog-summary p{margin:2px 0 0}</style>';
+fs.writeFileSync(path, html.replace(summary, '<main>').replace('</main>', () => footer + '</main>').replace('</html>', css + '</html>'));

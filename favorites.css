@@ -1,0 +1,6 @@
+.favorites-dialog{box-sizing:border-box;width:min(94vw,620px);max-height:86dvh;border:0;border-radius:14px;padding:18px;color:#17212b}
+.favorites-dialog::backdrop{background:#17212bb3}.favorites-dialog h2{display:inline-block;margin:0 18px 0 0}
+.favorites-dialog ul{padding:0;margin:0;list-style:none}.favorites-dialog li{display:flex;align-items:center;gap:6px;padding:8px 0;border-top:1px solid #ddd}
+.favorites-dialog li button:first-child{flex:1;text-align:left;font-weight:600}.favorites-dialog button{background:white}
+[data-favorite-ref][aria-pressed=true]{background:#fff0e5;border-color:#cb5400;color:#813400}
+.saved-views{display:flex;gap:6px;margin:12px 0}.saved-views [aria-pressed=true]{background:#17212b;color:white}

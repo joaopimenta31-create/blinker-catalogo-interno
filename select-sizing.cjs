@@ -1,0 +1,5 @@
+require('./filter-layout.cjs');
+const fs = require('node:fs');
+const path = 'public/index.html';
+const page = fs.readFileSync(path,'utf8');
+fs.writeFileSync(path,page.replace('</html>',"<style id=\"catalog-select-sizing\">\nmain{--filter-columns:4}\n@media(max-width:900px){main{--filter-columns:2}}\n@media(max-width:540px){main{--filter-columns:1}}\n.product-filter-group,#catalog-library.panel{padding-inline:15px}\n#product-filters,#catalog-library .catalog-filters,#catalog-library .catalog-search-fields{display:grid;grid-template-columns:repeat(var(--filter-columns),minmax(0,1fr));column-gap:12px}\n#catalog-library .catalog-search-fields>div{min-width:0}\n@media(min-width:541px){#catalog-library .catalog-search-fields>div:last-child{grid-column:2/-1}}\n#product-filters select,#catalog-library .catalog-filters select,#catalog-library .catalog-search-fields select{box-sizing:border-box;width:100%;max-width:none;min-width:0;height:54px;min-height:54px;font-size:16px;text-overflow:ellipsis}\n</style></html>"));

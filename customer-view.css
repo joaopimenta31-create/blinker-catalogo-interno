@@ -1,0 +1,13 @@
+.customer-controls{border:1px solid #c9cfd4;border-radius:10px;margin:12px 0;padding:0 12px}
+.customer-controls summary{padding:14px 0;color:#903b00;font-weight:700;cursor:pointer}
+.customer-controls form{display:grid;gap:12px;padding-bottom:14px}
+.customer-controls label{min-width:0}.customer-controls input{margin-top:5px}
+dialog.customer-screen{position:fixed;inset:0;margin:0;box-sizing:border-box;width:100%;height:100%;max-width:none;max-height:none;overflow:auto;background:#fff;color:#17212b;border:0;padding:24px 20px}
+.customer-screen::backdrop{background:white}
+.customer-screen article{max-width:620px;margin:0 auto;overflow-wrap:anywhere}
+.customer-screen strong{color:#a74300;letter-spacing:.08em}
+.customer-screen img{display:block;max-width:100%;max-height:34vh;object-fit:contain}
+.customer-screen h2{font-size:clamp(24px,5vw,38px);line-height:1.14}
+.customer-screen .customer-price{font-size:24px;font-weight:700}
+.customer-screen button{margin:18px 0;background:white}
+.customer-evidence figure{margin:16px 0}.customer-evidence img{width:100%;height:auto;max-height:none}.customer-evidence figcaption{color:#58636c;font-size:14px;margin-top:6px}

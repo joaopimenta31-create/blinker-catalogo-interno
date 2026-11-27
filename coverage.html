@@ -1,0 +1,32 @@
+<!doctype html><html lang="pt"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Cobertura das apresentações · Blinker</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#17212b;font:16px system-ui}main{max-width:850px;margin:auto;padding:22px 16px}a{color:#873900}h1{font-size:clamp(26px,5vw,38px)}button,input{font:inherit;padding:10px;border:1px solid #abb4be;border-radius:9px;background:white}button{cursor:pointer}button[aria-pressed=true]{background:#17212b;color:white}input{display:block;width:100%;margin:6px 0 14px}.filters{display:flex;gap:6px;flex-wrap:wrap}.item{display:block;background:white;color:#17212b;text-decoration:none;padding:14px;border-bottom:1px solid #e0e3e7}.item small{display:block;color:#58636c;margin-top:4px}#more{margin:14px 0}</style>
+<main><a href="/">← Catálogo Blinker</a><h1>Cobertura das apresentações</h1><p>Consulta a imagem disponível em «Mostrar ao cliente». Uma página de catálogo pode reunir várias referências.</p><label>Pesquisar por referência ou designação<input id="q" type="search"></label><div class="filters" id="filters"></div><p id="status" role="status">A carregar referências…</p><div id="results"></div><button id="more" hidden>Mostrar mais</button></main>
+<script>
+(async () => {
+ const labels={all:'Todas',individual:'Fotografia individual',page:'Página de catálogo',missing:'Sem imagem confirmada'};
+ const node=id=>document.getElementById(id);
+ const norm=s=>s.toLocaleLowerCase('pt').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ try {
+  const response=await fetch('coverage-data.json');
+  if(!response.ok) throw Error();
+  const rows=await response.json();
+  let group='all',limit=50;
+  function render(){
+   const terms=norm(node('q').value.trim()).split(/\s+/);
+   const found=rows.filter(([ref,name,state])=>(group==='all'||state===group)&&terms.every(t=>norm(ref+' '+name).includes(t)));
+   node('results').replaceChildren();
+   for(const [ref,name,state] of found.slice(0,limit)){
+    const link=document.createElement('a');link.className='item';link.href='/#ficha/'+encodeURIComponent(ref);link.textContent=name;
+    const sub=document.createElement('small');sub.textContent=ref+' · '+labels[state];link.append(sub);node('results').append(link);
+   }
+   node('status').textContent=found.length.toLocaleString('pt-PT')+' referências · '+Math.min(limit,found.length)+' apresentadas';
+   node('more').hidden=found.length<=limit;
+   for(const b of node('filters').children)b.setAttribute('aria-pressed',String(b.value===group));
+  }
+  for(const [key,label] of Object.entries(labels)){
+   const b=document.createElement('button');b.value=key;b.textContent=label+' · '+(key==='all'?rows.length:rows.filter(r=>r[2]===key).length).toLocaleString('pt-PT');b.onclick=()=>{group=key;limit=50;render()};node('filters').append(b);
+  }
+  node('q').oninput=()=>{limit=50;render()};node('more').onclick=()=>{limit+=50;render()};render();
+ } catch {node('status').textContent='Não foi possível carregar as referências. Atualiza a página para tentar novamente.'}
+})();
+</script></html>
