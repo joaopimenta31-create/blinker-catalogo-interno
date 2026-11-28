@@ -156,45 +156,191 @@
     borracha: 'borracha', silicone: 'silicone', plastico: 'plástico', nitrilo: 'nitrilo', latex: 'látex',
   };
 
+  const finishes = [
+    [/(?<![a-z0-9])s(?:em\s|\.\s?)banho(?![a-z])/g, () => 'Sem banho'],
+    [/(?<![a-z0-9])(?:zn|zin|zinc|zincad[oa]s?)(?![a-z0-9])/g, () => 'Zincado (ZN)'],
+    [/(?<![a-z0-9])(a[2-5]|hdg|pv|ht|hv\d{3})(?![a-z0-9])/g, m => m[1].toUpperCase()],
+  ];
+  const stopWords = new Set(('de da do das dos para com sem por em os as um uma no na nos nas ao aos ou '
+    + 'del con classe banho din iso').split(' '));
+  const keptPlurals = new Set(['gas', 'abs', 'inox', 'torx', 'pvc', 'mais', 'menos', 'lapis', 'tenis']);
+
+  function singular(word) {
+    if (word.length < 4 || keptPlurals.has(word) || !word.endsWith('s') || word.endsWith('ss')) return word;
+    return word.endsWith('oes') ? word.slice(0, -3) + 'ao' : word.slice(0, -1);
+  }
+  const capital = text => text.charAt(0).toUpperCase() + text.slice(1);
+  const abbreviations = { paraf: 'parafuso', conj: 'conjunto' };
+  const wordKey = word => abbreviations[word] || singular(word);
+  // "05" and "5", "1.50" and "1,5" are the same number.
+  const numbers = text => text.replace(/\d+(?:[.,]\d+)?/g,
+    n => String(Number(n.replace(',', '.'))).replace('.', ','));
+
+  // What a product's name says about it. Nothing is deduced beyond the words and codes written there.
   const cache = new WeakMap();
   function describe(product) {
     let found = cache.get(product);
     if (found) return found;
     const name = plain(product[1]).replace(/×/g, 'x');
-    const words = name.split(/[^a-z0-9]+/);
-    const size = new Set();
-    for (const m of name.matchAll(/(?<![a-z0-9])m(\d+(?:[.,]\d+)?)(?![0-9])/g)) size.add('M' + m[1]);
-    for (const m of name.matchAll(/(?<![a-z0-9])(m?)(\d+(?:[.,]\d+)?)\s?x\s?(\d+(?:[.,]\d+)?)(?![0-9])/g)) {
-      size.add(m[1].toUpperCase() + m[2] + 'x' + m[3]);
+    const d = {};
+    for (const group of ['norm', 'thread', 'size', 'finish', 'class', 'material', 'colour']) d[group] = new Set();
+    let rest = name;
+    // Reads every match of a pattern and removes it, so that its digits are not read again.
+    function take(pattern, use) {
+      rest = rest.replace(pattern, (...match) => {
+        use(match);
+        return ' ';
+      });
     }
-    for (const m of name.matchAll(/(?<![a-z0-9.,])(\d+(?:[.,]\d+)?)\s?(mm|cm|ml|kg|gr|lt|l|g)(?![a-z0-9])/g)) {
-      size.add(m[1] + m[2]);
+    take(/(?<![a-z])(din|iso|nfe|uni)\s*\.?\s*(\d{2,5})(?:\.\s?(10|12|4|5|6|8)(?![\d,x]))?(?:-[a-z]{1,2}(?![a-z]))?/g,
+      m => {
+        d.norm.add(m[1].toUpperCase() + ' ' + m[2]);
+        if (m[3]) d.class.add('Classe ' + m[3]);
+      });
+    take(/(?<![a-z])classe\s*(\d+(?:[.,]\d+)?)/g, m => d.class.add('Classe ' + m[1]));
+    for (const [pattern, label] of finishes) take(pattern, m => d.finish.add(label(m)));
+    take(/(?<![a-z0-9])(?:\d+\s)?\d+\/\d+(?:"|'')?/g, m => d.size.add(m[0]));
+    // Clothing and footwear sizes: "T.44", "T.XL", "T44".
+    take(/(?<![a-z])t\.\s?(x{0,3}[sl]|m|\d{1,2})(?![a-z0-9])|(?<![a-z0-9])t(\d{2})(?![a-z0-9])/g,
+      m => d.size.add('T' + (m[1] || m[2]).toUpperCase()));
+    take(/(?<![a-wyz0-9])(m-?)?(\d+(?:[.,]\d+)?(?:\s?x\s?\d+(?:[.,]\d+)?)+)(?:\s?(?:mm|cm)(?![a-z]))?/g, m => {
+      const size = m[2].replace(/\s/g, '');
+      d.size.add((m[1] ? 'M' : '') + size);
+      if (m[1]) d.thread.add('M' + size.split('x')[0]);
+    });
+    // "DIN 125X16": the norm is already removed, leaving the size after its "x".
+    take(/(?<![a-z])x\s?(\d+(?:[.,]\d+)?)(?![a-z0-9])/g, m => d.size.add(m[1]));
+    take(/(?<![a-z0-9])m-?(\d+(?:[.,]\d+)?)(?![a-z0-9])/g, m => d.thread.add('M' + m[1]));
+    take(/(?<![a-z0-9.,])(\d+(?:[.,]\d+)?)\s?(mm|cm|ml|kg|gr|lt|l|g|m|v|w|a)(?![a-z0-9])/g,
+      m => d.size.add(m[1] + m[2]));
+    take(/(?<![a-z0-9.,-])\d+(?:[.,]\d+)?(?![a-z0-9])/g, m => d.size.add(m[0]));
+
+    // How each word is written in the name, to label its option with accents.
+    d.surface = new Map();
+    for (const word of String(product[1]).toLowerCase().split(/[^\p{L}0-9]+/u)) {
+      d.surface.set(singular(plain(word)), word);
     }
-    const pick = table => new Set(words.filter(w => Object.hasOwn(table, w)).map(w => table[w]));
-    found = { size, colour: pick(colours), material: pick(materials) };
-    cache.set(product, found);
-    return found;
+    const words = text => text.split(/[^a-z0-9]+/).filter(word => /^[a-z]+$/.test(word));
+    const first = words(name).find(word => word.length > 1);
+    d.kind = first ? wordKey(first) : '';
+    d.type = [];
+    for (const word of words(rest)) {
+      if (Object.hasOwn(colours, word)) d.colour.add(colours[word]);
+      else if (Object.hasOwn(materials, word)) d.material.add(materials[word]);
+      else if (word.length > 2 && !stopWords.has(word)) {
+        const key = wordKey(word);
+        if (key !== d.kind && !d.type.includes(key)) d.type.push(key);
+      }
+    }
+    // Fractions and clothing sizes keep their writing; other measures are unified.
+    d.size = new Set([...d.size].map(size => /[/T]/.test(size) ? size : numbers(size)));
+    d.thread = new Set([...d.thread].map(numbers));
+    cache.set(product, d);
+    return d;
   }
 
-  function facets(results) {
-    const list = [];
-    for (const group of ['size', 'colour', 'material']) {
-      const counts = new Map();
-      for (const product of results) {
-        for (const value of describe(product)[group]) counts.set(value, (counts.get(value) || 0) + 1);
+  const groups = [
+    ['kind', 'Produto'], ['type', 'Tipo'], ['section', 'Secção'], ['norm', 'Norma'], ['thread', 'Rosca'],
+    ['size', 'Medida'], ['finish', 'Acabamento'], ['class', 'Classe'], ['material', 'Material'], ['colour', 'Cor'],
+  ];
+  const measured = new Set(['norm', 'thread', 'size', 'class']);
+  const noSections = () => [];
+  // catalog(ref): what a catalogue table says about a reference: { table, norm?, finish?, values }.
+  const noCatalog = () => undefined;
+  const column = 'column:';
+
+  function valuesOf(product, group, { sections = noSections, catalog = noCatalog }) {
+    const ref = String(product[0]);
+    if (group === 'section') return sections(ref);
+    if (group === 'table' || group.startsWith(column)) {
+      const entry = catalog(ref);
+      if (group === 'table') return entry ? [entry.table] : [];
+      const label = group.slice(column.length);
+      return (entry?.values || []).filter(([name, value]) => name === label && value).map(([, value]) => value);
+    }
+    const d = describe(product);
+    if (group === 'kind') return d.kind ? [d.kind] : [];
+    if (group !== 'norm' && group !== 'finish') return [...d[group]];
+    let stated = catalog(ref)?.[group];
+    if (stated === 'Zincada') stated = 'Zincado (ZN)';
+    return stated ? [...new Set([...d[group], stated])] : [...d[group]];
+  }
+
+  // The catalogue's tables, and their columns once every result belongs to one.
+  function groupsFor(results, { catalog = noCatalog }) {
+    const entries = results.map(product => catalog(String(product[0])));
+    const columns = entries.every(Boolean)
+      ? [...new Set(entries.flatMap(entry => entry.values.map(([name]) => name)))] : [];
+    const list = [...groups];
+    list.splice(2, 0, ['table', 'Tabela'], ...columns.map(name => [column + name, name]));
+    return list;
+  }
+
+  // Words that appear in exactly the same products, side by side, become one option ("aba larga").
+  function mergeTypes(counts, results) {
+    const pairs = new Map();
+    for (const product of results) {
+      const words = describe(product).type;
+      for (let i = 1; i < words.length; i++) {
+        const pair = words[i - 1] + ' ' + words[i];
+        pairs.set(pair, (pairs.get(pair) || 0) + 1);
       }
-      list.push(...[...counts]
+    }
+    const next = new Map(), joined = new Set();
+    for (const [pair, count] of pairs) {
+      const [a, b] = pair.split(' ');
+      if (counts.get(a) !== count || counts.get(b) !== count || next.has(a) || joined.has(b)) continue;
+      next.set(a, b);
+      joined.add(b);
+    }
+    const merged = new Map();
+    for (const [word, count] of counts) {
+      if (joined.has(word)) continue;
+      const parts = [word];
+      while (next.has(parts.at(-1)) && !parts.includes(next.get(parts.at(-1)))) parts.push(next.get(parts.at(-1)));
+      merged.set(parts.join(' '), count);
+    }
+    return merged;
+  }
+
+  // The steps that can still divide these results, each with every option and its count.
+  function facets(results, options = {}) {
+    const list = [];
+    for (const [group, title] of groupsFor(results, options)) {
+      const worded = group === 'kind' || group === 'type';
+      let counts = new Map();
+      const spellings = new Map();
+      for (const product of results) {
+        for (const value of valuesOf(product, group, options)) {
+          counts.set(value, (counts.get(value) || 0) + 1);
+          if (!worded) continue;
+          const written = describe(product).surface.get(value) || value;
+          const seen = spellings.get(value) || new Map();
+          seen.set(written, (seen.get(written) || 0) + 1);
+          spellings.set(value, seen);
+        }
+      }
+      if (group === 'type') counts = mergeTypes(counts, results);
+      const spelled = word => [...spellings.get(word)].sort((a, b) => b[1] - a[1])[0][0];
+      const values = [...counts]
         .filter(([, count]) => count < results.length)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 6)
-        .map(([value, count]) => ({ group, value, count })));
+        .map(([value, count]) => ({
+          value, count, label: capital(worded ? value.split(' ').map(spelled).join(' ') : value),
+        }));
+      values.sort(measured.has(group) || group.startsWith(column)
+        ? (a, b) => a.label.localeCompare(b.label, 'pt', { numeric: true })
+        : (a, b) => b.count - a.count || a.label.localeCompare(b.label, 'pt'));
+      if (values.length) list.push({ group, label: title, values });
     }
     return list;
   }
 
-  function applyFacets(results, selected) {
-    const wanted = Object.entries(selected).filter(([, value]) => value);
-    return results.filter(product => wanted.every(([group, value]) => describe(product)[group].has(value)));
+  // selected: [{ group, value }]; a product must match every choice.
+  function applyFacets(results, selected, options = {}) {
+    return results.filter(product => selected.every(({ group, value }) => {
+      const own = valuesOf(product, group, options);
+      return group === 'type' ? value.split(' ').every(word => own.includes(word)) : own.includes(value);
+    }));
   }
 
   // familyEntry is FAMILY_DATA.products[ref]: { f: families, c: catalogues }.

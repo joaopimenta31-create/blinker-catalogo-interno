@@ -9,7 +9,25 @@
   const photos = typeof searchPhotos === 'undefined' ? {} : searchPhotos;
   const pageSize = 30;
   const euros = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 });
-  let search, found, selected = {}, shown = pageSize, timer;
+  let search, found, selected = [], openStep, shown = pageSize, timer;
+  const catalogued = window.QUICK_DATA.sections;
+  const sections = ref => (catalogued.refs[ref] || []).map(id => catalogued.titles[id]);
+  const tabled = window.QUICK_DATA.catalogue;
+  function catalogEntry(ref) {
+    if (!Object.hasOwn(tabled.refs, ref)) return undefined;
+    const [id, finish, values] = tabled.refs[ref];
+    const { table, norm, columns } = tabled.tables[id];
+    return { table, norm, finish, values: columns.map((name, i) => [name, values[i]]) };
+  }
+  const described = { sections, catalog: catalogEntry };
+  // "Selagem de cobre · A 10,2 · B 15,9": what the catalogue table says, under the name.
+  function tableLine(ref) {
+    const entry = catalogEntry(ref);
+    if (!entry) return null;
+    const values = entry.values.filter(([, value]) => value)
+      .map(([name, value]) => name.replace(' (mm)', '') + ' ' + value);
+    return [entry.table, ...values].join(' · ');
+  }
 
   function make(tag, className, text) {
     const node = document.createElement(tag);
@@ -48,7 +66,11 @@
   const chips = make('div', 'rq-chips');
   chips.setAttribute('role', 'group');
   chips.setAttribute('aria-label', 'Refinar resultados');
-  bar.append(form, filters, chips);
+  const options = make('div', 'rq-options');
+  options.id = 'rq-options';
+  options.setAttribute('role', 'group');
+  options.hidden = true;
+  bar.append(form, filters, chips, options);
   const area = make('div', 'rq-area');
   const notice = make('p', 'rq-notice');
   notice.setAttribute('aria-live', 'polite');
@@ -145,6 +167,8 @@
     const line = make('div', 'rq-refline');
     line.append(reference, copyButton(ref, reference));
     item.append(thumbnail(product), link, line, price);
+    const stated = tableLine(ref);
+    if (stated) item.append(make('span', 'rq-table', stated));
     return item;
   }
 
@@ -155,8 +179,9 @@
     return button;
   }
 
-  function refine(group, value) {
-    selected = { ...selected, [group]: value };
+  function refine(choices) {
+    selected = choices;
+    openStep = undefined;
     shown = pageSize;
     render();
   }
@@ -168,7 +193,7 @@
     const asked = input.value.trim();
     const filtered = Boolean(family.value || catalog.value);
     const results = found
-      ? QuickSearch.sortByPrice(QuickSearch.applyFacets(found.results, selected), sort.value) : [];
+      ? QuickSearch.sortByPrice(QuickSearch.applyFacets(found.results, selected, described), sort.value) : [];
 
     const messages = [];
     if (found?.ignored.length) messages.push('Sem resultados para tudo. A mostrar sem ' + quoted(found.ignored) + '.');
@@ -198,12 +223,30 @@
           restart();
         });
       }),
-      ...Object.entries(selected).filter(([, value]) => value)
-        .map(([group, value]) => chip(value + ' ✕', true, () => refine(group, undefined))),
-      ...QuickSearch.facets(results)
-        .filter(f => !selected[f.group])
-        .map(f => chip(f.value + ' (' + f.count + ')', false, () => refine(f.group, f.value))),
+      ...selected.map(choice => chip(choice.label + ' ✕', true,
+        () => refine(selected.filter(other => other !== choice)))),
     );
+    // One button per step that can still divide the results; it opens that step's options.
+    const steps = QuickSearch.facets(results, described);
+    for (const step of steps) {
+      const open = step.group === openStep;
+      const button = control('rq-step', step.label + ' (' + step.values.length + ') ' + (open ? '▴' : '▾'));
+      button.dataset.step = step.group;
+      button.setAttribute('aria-expanded', String(open));
+      button.setAttribute('aria-controls', options.id);
+      button.onclick = () => {
+        openStep = open ? undefined : step.group;
+        render();
+        chips.querySelector('[data-step="' + step.group + '"]')?.focus({ preventScroll: true });
+      };
+      chips.append(button);
+    }
+    const current = steps.find(step => step.group === openStep);
+    options.hidden = !current;
+    options.setAttribute('aria-label', current ? current.label : '');
+    options.replaceChildren(...(current?.values || []).map(option => chip(
+      option.label + ' (' + option.count + ')', false,
+      () => refine([...selected, { group: current.group, value: option.value, label: option.label }]))));
     list.replaceChildren(...results.slice(0, shown).map(row));
     more.hidden = results.length <= shown;
   }
@@ -221,7 +264,8 @@
   }
   // A new search starts from the first page, without the previous refinements.
   function restart() {
-    selected = {};
+    selected = [];
+    openStep = undefined;
     shown = pageSize;
     run();
     if (!search) render();
