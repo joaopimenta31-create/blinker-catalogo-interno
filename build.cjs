@@ -4,3 +4,4 @@ execFileSync(process.execPath, ['search-navigation-build.cjs'], {stdio:'inherit'
 require('./wahlen-build.cjs');
 require('./word-suggestions-build.cjs');
 require('./pwa-build.cjs');
+require('./quick-page-build.cjs');
