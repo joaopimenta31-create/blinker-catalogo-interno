@@ -22,7 +22,7 @@ const groups=[
  ['parafuso','parafusos','tornillo','tornillos'],
  ['porca','porcas','tuerca','tuercas'],['anilha','anilhas','arandela','arandelas'],
  ['bujao','bujoes','bujon','bujones'],['tampao','tampoes','tapon','tapones'],
- ['massa','massas','pasta','pastas','graxa','graxas','grasa','grasas','grease'],
+ ['massa','massas','pasta','pastas','graxa','graxas','grasa','grasas','grease','paste'],
  ['cobre','copper'],['oleo','oleos','aceite','aceites','oil','oils'],
  ['cola','colas','adesivo','adesivos','adhesivo','adhesivos','glue'],
  ['vedante','vedantes','selante','selantes','sellador','selladores'],
