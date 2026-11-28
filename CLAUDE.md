@@ -60,7 +60,7 @@ Search has been replaced in layers, and the earlier layers still run at build ti
 
 ### Product search the user sees
 
-The search on the main page has real source files in `frontend/pesquisa/` (designs in `docs/superpowers/specs/`). Edit those directly; no patching is involved. `search-core.js` holds the behaviour (fallback when words don't match, typo correction, refine chips, filters, brand terms) on top of `strict-engine.js`; `page.js` is the DOM layer. `quick-page-build.cjs`, the last step, appends them to `index.html`. Its brand patterns duplicate those in `multi-search.cjs` and `wahlen-build.cjs`; change them together.
+The search on the main page has real source files in `frontend/pesquisa/`. Edit those directly; no patching is involved. `search-core.js` holds the behaviour (fallback when words don't match, typo correction, refine chips, filters, brand terms) on top of `strict-engine.js`; `page.js` is the DOM layer. `quick-page-build.cjs`, the last step, appends them to `index.html`. Its brand patterns duplicate those in `multi-search.cjs` and `wahlen-build.cjs`; change them together.
 
 The older search interface is still built and loaded but hidden by `page.css`: its input, suggestions (`navigation.js`), result cards, compare (`compare.js`) and shortcuts (`quick-view.js`). The older steps' assertions and other features depend on it, so it was not removed. Changing it has no visible effect. `page.js` does reuse its filter `<select>`s (replacing their handlers) and opens product sheets with the global `detail()`.
 
