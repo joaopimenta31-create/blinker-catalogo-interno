@@ -27,6 +27,65 @@ const brands = {
   wahlenMachines: wahlen.machines,
 };
 
+// Catalogue sections of each reference, from every catalogue's table of contents below its top level.
+function catalogueSections() {
+  const titles = [], refs = {};
+  const root = path.join(output, 'catalogs');
+  for (const slug of fs.readdirSync(root)) {
+    const file = path.join(root, slug, 'index.json');
+    if (slug === '1hourtec' || !fs.existsSync(file)) continue;
+    const meta = JSON.parse(read(file));
+    const pages = meta.pages || meta.page_files.flatMap(name => JSON.parse(read(path.join(root, slug, name))));
+    const toc = meta.toc || [];
+    toc.forEach((entry, i) => {
+      if (entry.level < 2) return;
+      // "02. PORCAS E ANILHAS" and "12. P-014: ANILHAS-PORCAS" lose their numbering.
+      const text = entry.title.replace(/^(?:\s*(?:\d+\.|P-\d+\s*:))+\s*/i, '').trim().toLocaleLowerCase('pt');
+      if (!text) return;
+      const title = text.charAt(0).toLocaleUpperCase('pt') + text.slice(1);
+      let id = titles.indexOf(title);
+      if (id < 0) id = titles.push(title) - 1;
+      const next = toc.slice(i + 1).find(other => other.level <= entry.level);
+      const end = Math.max(next ? next.page : entry.page + 1, entry.page + 1);
+      for (const page of pages) {
+        if (page.page < entry.page || page.page >= end) continue;
+        for (const ref of page.references || []) {
+          const own = refs[ref] ??= [];
+          if (!own.includes(id)) own.push(id);
+        }
+      }
+    });
+  }
+  return { titles, refs };
+}
+const sections = catalogueSections();
+const washers = sections.titles.indexOf('Porcas e anilhas');
+assert(washers >= 0 && Object.values(sections.refs).some(ids => ids.includes(washers)),
+  'Secções dos catálogos em falta');
+brands.sections = sections;
+
+// Values transcribed from catalogue tables, by reference.
+function catalogueTables() {
+  const file = JSON.parse(read(path.join(source, 'tabelas-anilhas.json')));
+  const tables = [], refs = {};
+  for (const table of file.tabelas) {
+    for (const [references, values] of table.linhas) {
+      assert.equal(values.length, table.colunas.length, 'Colunas erradas: ' + table.tabela + ' ' + references);
+      references.forEach((ref, i) => {
+        if (!ref) return;
+        assert(!refs[ref], 'Referência repetida nas tabelas: ' + ref);
+        refs[ref] = [tables.length, table.acabamentos?.[i] || '', values];
+      });
+    }
+    tables.push({
+      table: table.tabela, norm: table.norma || table.tabela.match(/DIN \d+/)?.[0] || '',
+      columns: table.colunas, page: table.pagina, slug: file.slug,
+    });
+  }
+  return { tables, refs };
+}
+brands.catalogue = catalogueTables();
+
 const target = path.join(output, 'pesquisa');
 fs.mkdirSync(target, { recursive: true });
 function emit(name, content) {
@@ -72,4 +131,19 @@ const family = vm.runInContext(`
   quickSearch('', p => QuickSearch.matchesFilters(FAMILY_DATA.products[p[0]], { family: first[1].f[0], catalog: '' }))
 `, context);
 assert(family.results.length, 'Filtro por família sem resultados');
+// Subfamilies: only products that say "esmagamento" belong to it.
+const crush = vm.runInContext(`
+  const washerList = quickSearch('anilha').results;
+  const type = QuickSearch.facets(washerList).find(step => step.group === 'type');
+  const choice = type.values.find(option => option.value.split(' ').includes('esmagamento'));
+  QuickSearch.applyFacets(washerList, [{ group: 'type', value: choice.value }])
+`, context);
+assert(crush.length && crush.every(p => /esmagamento/i.test(p[1])), 'Subfamília esmagamento incorreta');
+// Catalogue tables: every page cited exists and the transcribed references are real products.
+const known = new Set(vm.runInContext('PRODUCTS.map(p => p[0])', context));
+const transcribed = Object.keys(brands.catalogue.refs);
+const unknown = transcribed.filter(ref => !known.has(ref));
+// Printed in the catalogue but absent from the price list.
+assert.deepEqual(unknown.sort(), ['0883339', '17610', '1766', '1768'],'Referências desconhecidas nas tabelas');
+console.log('Tabelas do catálogo: ' + (transcribed.length - unknown.length) + ' referências.');
 console.log('Nova pesquisa integrada e verificada.');

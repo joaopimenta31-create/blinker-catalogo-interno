@@ -44,16 +44,74 @@ test('brands', () => {
   assert.deepEqual(refs(search('whalen')), ['301','300']);
   assert.deepEqual(refs(search('wählen rebarbadora')), ['300']);
 });
+const group = (f, name) => f.find(g => g.group === name)?.values || [];
+const option = (f, name, label) => group(f, name).find(v => v.label === label);
 test('facets come from names, only when they split the list', () => {
   const list = search('parafuso').results, f = facets(list);
-  assert.equal(f.find(x => x.value === 'M8').count, 2);
-  assert.equal(f.find(x => x.value === 'inox').count, 2);
-  assert.ok(!facets(list.filter(p => p[0] !== '101')).some(x => x.value === 'inox'));
-  assert.deepEqual(applyFacets(list, {size:'M8', material:'inox'}).map(p => p[0]), ['100']);
+  assert.equal(option(f, 'thread', 'M8').count, 2);
+  assert.equal(option(f, 'material', 'Inox').count, 2);
+  assert.ok(!option(facets(list.filter(p => p[0] !== '101')), 'material', 'Inox'));
+  const chosen = [{group:'thread', value:'M8'}, {group:'material', value:'inox'}];
+  assert.deepEqual(applyFacets(list, chosen).map(p => p[0]), ['100']);
 });
 test('colour forms are one chip', () => {
-  assert.ok(!facets(search('silicone').results).some(x => x.group === 'colour'));
-  assert.equal(facets([...search('silicone').results, P[7]]).find(x => x.value === 'preto').count, 2);
+  assert.equal(group(facets(search('silicone').results), 'colour').length, 0);
+  assert.equal(option(facets([...search('silicone').results, P[7]]), 'colour', 'Preto').count, 2);
+});
+
+const washers = [
+  ['1','ANILHAS COBRE-ESMAGAMENTO 14X22'], ['2','ANILHAS COBRE-ESMAGAMENTO 10X14'],
+  ['3','ANILHAS DE COBRE 4X8 MM.'], ['4','ANILHA CARTER ALUMINIO 14X22'],
+  ['5','ANILHA GROWER DIN 127 SEM BANHO M5'], ['6','ANILHA ABA LARGA DIN 9021 10X30'],
+  ['7','ANILHA ABA LARGA DIN 9021 8X24 A2'],
+];
+const nuts = [
+  ['10','PORCA DIN 985.8 ZN M24'], ['11','PORCA AUTOBLOCANTE DIN 985 A4 M30'],
+  ['12','PORCA SERRILHADA DIN 6923 A2 M6'], ['13','PORCA DIN 934 CLASSE 8 ZIN. M10'],
+  ['14','PORCA DIN 934 12'],
+];
+const only = (list, groupName, label) => {
+  const value = option(facets(list), groupName, label).value;
+  return applyFacets(list, [{group: groupName, value}]).map(p => p[0]);
+};
+test('a subfamily holds only the products whose name says so', () => {
+  assert.deepEqual(only(washers, 'type', 'Esmagamento'), ['1','2']);
+});
+test('words that always go together are one option', () => {
+  assert.deepEqual(only(washers, 'type', 'Aba larga'), ['6','7']);
+  assert.ok(!option(facets(washers), 'type', 'Aba'));
+});
+test('singular and plural names are the same product', () => {
+  assert.equal(group(facets([...washers, ...nuts]), 'kind').find(v => v.label.startsWith('Anilha')).count, 7);
+});
+test('norm, thread, size, finish and class are separate steps', () => {
+  assert.deepEqual(only(nuts, 'norm', 'DIN 985'), ['10','11']);
+  assert.deepEqual(only(nuts, 'norm', 'DIN 6923'), ['12']);
+  assert.deepEqual(only(nuts, 'thread', 'M24'), ['10']);
+  assert.deepEqual(only(nuts, 'finish', 'Zincado (ZN)'), ['10','13']);
+  assert.deepEqual(only(nuts, 'class', 'Classe 8'), ['10','13']);
+  assert.deepEqual(only(nuts, 'size', '12'), ['14']);
+  assert.deepEqual(only(washers, 'size', '14x22'), ['1','4']);
+  assert.deepEqual(only(washers, 'finish', 'Sem banho'), ['5']);
+});
+test('every option is offered, not only the first six', () => {
+  const many = Array.from({length: 12}, (unused, i) => [String(i), 'PORCA M' + (i + 1)]);
+  assert.deepEqual(group(facets(many), 'thread').map(v => v.label).slice(0, 3), ['M1','M2','M3']);
+  assert.equal(group(facets(many), 'thread').length, 12);
+});
+test('choices accumulate and the next steps only show what is left', () => {
+  const chosen = [{group:'type', value: option(facets(washers), 'type', 'Esmagamento').value}];
+  const left = applyFacets(washers, chosen);
+  const next = facets(left, { selected: chosen });
+  assert.ok(!option(next, 'type', 'Esmagamento'));
+  assert.deepEqual(group(next, 'size').map(v => v.label), ['10x14','14x22']);
+});
+test('catalogue sections are a step of their own', () => {
+  const sections = ref => ref === '4' ? ['Anilhas de vedação'] : [];
+  const f = facets(washers, { sections });
+  assert.equal(option(f, 'section', 'Anilhas de vedação').count, 1);
+  const chosen = [{group:'section', value:'Anilhas de vedação'}];
+  assert.deepEqual(applyFacets(washers, chosen, { sections }).map(p => p[0]), ['4']);
 });
 
 // Findings from the final review. The engine keeps module-level vocabulary, so each builds its own search.
@@ -111,4 +169,34 @@ test('price order puts products without price last', () => {
   assert.deepEqual(sortByPrice(list, 'low').map(p => p[0]), ['c','b','a']);
   assert.deepEqual(sortByPrice(list, 'high').map(p => p[0]), ['b','c','a']);
   assert.deepEqual(sortByPrice(list, 'relevance').map(p => p[0]), ['a','b','c']);
+});
+
+test('the same value written differently is one option', () => {
+  const list = [['20','PARAF. SEXT M05 1.50MM'], ['21','PARAFUSO SEXT M5 1,5MM'], ['22','PORCA M6 2,0MM']];
+  const f = facets(list);
+  assert.equal(option(f, 'thread', 'M5').count, 2);
+  assert.equal(option(f, 'size', '1,5mm').count, 2);
+  assert.ok(option(f, 'size', '2mm'));
+  assert.equal(option(f, 'kind', 'Parafuso').count, 2);
+});
+
+const catalog = ref => ({
+  '1': { table: 'Selagem de cobre', norm: 'DIN 7603', values: [['A (mm)', '14,2'], ['C (mm)', '2']] },
+  '2': { table: 'Selagem de cobre', norm: 'DIN 7603', values: [['A (mm)', '10,2'], ['C (mm)', '1,5']] },
+  '3': { table: 'Cobre', finish: 'A2', values: [['A (mm)', '4,2'], ['C (mm)', '1,5']] },
+})[ref];
+test('catalogue tables are a step, with their norm and finish', () => {
+  const f = facets(washers, { catalog });
+  assert.equal(option(f, 'table', 'Selagem de cobre').count, 2);
+  assert.equal(option(f, 'norm', 'DIN 7603').count, 2);
+  assert.equal(option(f, 'finish', 'A2').count, 2);
+});
+test('table columns are steps only when every result has table data', () => {
+  assert.ok(!facets(washers, { catalog }).some(step => step.label === 'A (mm)'));
+  const chosen = [{ group: 'table', value: 'Selagem de cobre' }];
+  const left = applyFacets(washers, chosen, { catalog });
+  const step = facets(left, { catalog }).find(s => s.label === 'A (mm)');
+  assert.deepEqual(step.values.map(v => v.label), ['10,2', '14,2']);
+  const next = [...chosen, { group: step.group, value: '10,2' }];
+  assert.deepEqual(applyFacets(washers, next, { catalog }).map(p => p[0]), ['2']);
 });

@@ -17,6 +17,10 @@ main:has(#prod.hide)>:is(.rq-bar,.rq-area){display:none}
 .rq-chips:not(:empty){padding-top:8px}
 .rq-bar .rq-chip{flex:none;min-width:44px;padding:0 14px;white-space:nowrap}
 .rq-bar .rq-chip[aria-pressed=true]{border-color:#e94c0a;background:#e94c0a;color:#fff}
+.rq-bar .rq-step{flex:none;padding:0 12px;white-space:nowrap;font-weight:650}
+.rq-bar .rq-step[aria-expanded=true]{border-color:#e94c0a;background:#fff0e5;color:#813400}
+.rq-options{display:flex;flex-wrap:wrap;gap:8px;max-height:40dvh;overflow:auto;overscroll-behavior:contain;margin-top:8px;padding:10px;border-radius:10px;background:#f4f5f8}
+.rq-options .rq-chip{max-width:100%;text-align:left}
 .rq-status{color:#515d67;font-size:14px}
 .rq-notice{margin:10px 0;padding:10px 12px;border:1px solid #e94c0a;border-radius:10px;background:#fff4ee}
 .rq-results{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0;padding:0;list-style:none}
@@ -31,6 +35,7 @@ main:has(#prod.hide)>:is(.rq-bar,.rq-area){display:none}
 .rq-ref{font:700 22px/1.2 ui-monospace,Consolas,monospace;overflow-wrap:anywhere;user-select:all}
 .rq-area .rq-copy{flex:none;min-width:104px;border-color:#e94c0a;color:#8a2c03}
 .rq-price{color:#515d67;font-size:13px}
+.rq-table{grid-column:2;margin-top:4px;font-size:13px;overflow-wrap:anywhere}
 .rq-area .rq-more{display:block;width:100%;margin-top:12px}
 .rq-viewer{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;padding:12px;border:0;background:#17212b}
 .rq-viewer[open]{display:flex;flex-direction:column;gap:12px}
